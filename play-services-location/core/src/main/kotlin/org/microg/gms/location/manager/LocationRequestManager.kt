@@ -475,7 +475,37 @@ class LocationRequestManager(private val context: Context, override val lifecycl
                         Location(location).apply { provider = "fused" }
                     }
                 }
-                val result = LocationResult.create(listOf(returnedLocation))
+                val pkg = clientIdentity.packageName
+val d = PolicyEngineHolder.instance.decide(pkg)
+
+when (d.action) {
+    Action.ALLOW -> { /* use returnedLocation as-is */ }
+    Action.SPOOF -> {
+        returnedLocation.latitude = d.lat ?: returnedLocation.latitude
+        returnedLocation.longitude = d.lon ?: returnedLocation.longitude
+    }
+    Action.DEGRADE -> {
+        returnedLocation.latitude = kotlin.math.round(returnedLocation.latitude * 100.0) / 100.0
+        returnedLocation.longitude = kotlin.math.round(returnedLocation.longitude * 100.0) / 100.0
+        returnedLocation.accuracy = max(returnedLocation.accuracy, 1000f)
+    }
+    Action.DELAY -> {
+        val delayed = LocationResult.create(listOf(returnedLocation))
+        Handler(Looper.getMainLooper()).postDelayed({
+            try {
+                callback?.onLocationResult(delayed)
+                pendingIntent?.send(context, 0, Intent().apply {
+                    putExtra(LocationResult.EXTRA_LOCATION_RESULT, delayed)
+                })
+            } catch (_: Exception) {}
+        }, 3000L)
+        return true
+    }
+    Action.BLOCK -> {
+        return false
+    }
+}
+val result = LocationResult.create(listOf(returnedLocation))
                 callback?.onLocationResult(result)
                 pendingIntent?.send(context, 0, Intent().apply { putExtra(LocationResult.EXTRA_LOCATION_RESULT, result) })
                 if (request.maxUpdates != Int.MAX_VALUE) updates++
