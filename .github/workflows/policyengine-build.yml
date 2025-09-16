@@ -1,13 +1,16 @@
 name: Build GmsCore (PolicyEngine)
 
 on:
-  workflow_dispatch: {}   # run manually from the Actions tab
+  workflow_dispatch:
+  push:
+    branches: [ master ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout fork
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -15,32 +18,35 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
+      # Correct way to install Android SDK bits (sdkmanager package names)
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          api-level: 34
-          build-tools: 34.0.0
-          cache: gradle
+          packages: |
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
 
       - name: Make gradlew executable
-        run: chmod +x gradlew
+        run: chmod +x ./gradlew
 
-      # Try the two most common app modules for GmsCore
-      - name: Assemble debug (try :app)
-        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace || true
+      # Build (assemble everything) — adjust if you want only debug:
+      - name: Assemble
+        run: ./gradlew assemble --no-daemon
 
-      - name: Assemble debug (try :play-services-core)
-        run: ./gradlew :play-services-core:assembleDebug --no-daemon --stacktrace || true
-
+      # Print out where APKs actually landed
       - name: List APK outputs
         run: |
-          echo "Looking for APKs under build/outputs..."
-          find . -path "*/build/outputs/apk/*/*.apk" -print || true
+          echo "Searching for APKs..."
+          find . -type f -name "*.apk" -printf "%p\n"
 
+      # Super-broad pattern so we don't miss the APK no matter the module name
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: gmscore-policyengine-debug
+          name: microg-policyengine-apks
           path: |
-            **/build/outputs/apk/*/*.apk
+            **/build/outputs/**/*.apk
+          if-no-files-found: warn
