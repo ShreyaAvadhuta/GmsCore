@@ -1,0 +1,46 @@
+name: Build GmsCore (PolicyEngine)
+
+on:
+  workflow_dispatch: {}   # run manually from the Actions tab
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          build-tools: 34.0.0
+          cache: gradle
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      # Try the two most common app modules for GmsCore
+      - name: Assemble debug (try :app)
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace || true
+
+      - name: Assemble debug (try :play-services-core)
+        run: ./gradlew :play-services-core:assembleDebug --no-daemon --stacktrace || true
+
+      - name: List APK outputs
+        run: |
+          echo "Looking for APKs under build/outputs..."
+          find . -path "*/build/outputs/apk/*/*.apk" -print || true
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: gmscore-policyengine-debug
+          path: |
+            **/build/outputs/apk/*/*.apk
