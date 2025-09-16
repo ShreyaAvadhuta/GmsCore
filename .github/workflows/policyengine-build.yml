@@ -20,7 +20,7 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      # Correct way to install Android SDK bits (sdkmanager package names)
+      # Install Android SDK bits via sdkmanager package names
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -32,21 +32,22 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # Build (assemble everything) — adjust if you want only debug:
+      # Build everything; if your edits are only in GmsCore, this suffices
       - name: Assemble
         run: ./gradlew assemble --no-daemon
 
-      # Print out where APKs actually landed
+      # Show exactly where APKs landed
       - name: List APK outputs
         run: |
-          echo "Searching for APKs..."
-          find . -type f -name "*.apk" -printf "%p\n"
+          echo "=== APKs found ==="
+          find . -type f -name "*.apk" -printf "%p\n" || true
 
-      # Super-broad pattern so we don't miss the APK no matter the module name
+      # Broad patterns so we don't miss anything regardless of module name/layout
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
           name: microg-policyengine-apks
           path: |
-            **/build/outputs/**/*.apk
+            **/outputs/apk/**/*.apk
+            **/build/outputs/apk/**/*.apk
           if-no-files-found: warn
